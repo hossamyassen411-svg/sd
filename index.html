@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- السطر ده مهم جداً عشان نكسر حماية الـ Referer -->
+    <meta name="referrer" content="no-referrer">
+    <title>سحب وتحميل الفيديوهات - Pentest</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #0f172a;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #38bdf8;
+            font-size: 24px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            background: #0f172a;
+            color: white;
+            font-size: 16px;
+            text-align: center;
+        }
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn-fetch { background-color: #3b82f6; color: white; }
+        .btn-fetch:hover { background-color: #2563eb; }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            display: none; /* مخفي لحد ما الفيديو يجي */
+        }
+        .btn-download { flex: 1; background-color: #10b981; color: white; }
+        .btn-download:hover { background-color: #059669; }
+        .btn-all { flex: 1; background-color: #f59e0b; color: white; }
+        .btn-all:hover { background-color: #d97706; }
+
+        .status {
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: bold;
+            color: #fbbf24;
+            min-height: 24px;
+        }
+        .video-wrapper {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: none;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🛡️ أداة اختبار سحب الفيديوهات (Pentest)</h1>
+        
+        <div class="input-group">
+            <input type="number" id="lessonId" placeholder="اكتب رقم الدرس" value="16">
+            <button class="btn-fetch" onclick="fetchVideo()">جلب الفيديو</button>
+        </div>
+
+        <div class="status" id="statusMessage"></div>
+
+        <div class="action-buttons" id="actionButtons">
+            <button class="btn-download" onclick="downloadCurrentVideo()">⬇️ فتح الفيديو للتحميل</button>
+            <button class="btn-all" onclick="extractAllLinks()">📦 استخراج كل الروابط (1-50)</button>
+        </div>
+
+        <div class="video-wrapper" id="videoContainer">
+            <!-- الفيديو هيظهر هنا -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "https://hossameddin.tech/api/lessons";
+        let currentVideoUrl = "";
+
+        async function fetchVideo() {
+            const lessonId = document.getElementById('lessonId').value;
+            const statusEl = document.getElementById('statusMessage');
+            const videoContainer = document.getElementById('videoContainer');
+            const actionButtons = document.getElementById('actionButtons');
+            
+            statusEl.innerText = `جاري جلب بيانات الدرس رقم ${lessonId}...`;
+            videoContainer.innerHTML = '';
+            videoContainer.style.display = 'none';
+            actionButtons.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE}/${lessonId}/video`, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error(`السيرفر رفض الطلب: ${response.status}`);
+
+                const data = await response.json();
+                
+                if (data && data.url) {
+                    currentVideoUrl = data.url;
+                    statusEl.innerText = `تم جلب الفيديو بنجاح! جاري التحميل...`;
+                    
+                    // حقن الفيديو
+                    const iframe = document.createElement('iframe');
+                    iframe.src = currentVideoUrl;
+                    
+                    // دي أهم حتة عشان نكسر حماية 403 على GitHub
+                    iframe.setAttribute('referrerpolicy', 'no-referrer'); 
+                    
+                    iframe.allow = "autoplay; fullscreen; encrypted-media; picture-in-picture";
+                    iframe.allowFullscreen = true;
+                    
+                    videoContainer.appendChild(iframe);
+                    videoContainer.style.display = 'block';
+                    actionButtons.style.display = 'flex';
+                } else {
+                    throw new Error("لم يتم العثور على رابط فيديو في الرد.");
+                }
+
+            } catch (error) {
+                statusEl.innerText = `❌ خطأ: ${error.message}`;
+                console.error(error);
+            }
+        }
+
+        function downloadCurrentVideo() {
+            if (!currentVideoUrl) return;
+            window.open(currentVideoUrl, '_blank');
+            alert("تم فتح الفيديو في نافذة جديدة.\nلو عايز تحمله كملف، استخدم إضافة Video DownloadHelper في المتصفح.");
+        }
+
+        async function extractAllLinks() {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.innerText = "جاري فحص الدروس من 1 إلى 50... (قد يستغرق وقتاً)";
+            
+            let links = "=== روابط فيديوهات الكورسات ===\n\n";
+            let count = 0;
+
+            for (let i = 1; i <= 50; i++) {
+                try {
+                    statusEl.innerText = `جاري فحص الدرس رقم ${i}...`;
+                    const response = await fetch(`${API_BASE}/${i}/video`);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.url) {
+                            links += `الدرس ${i}:\n${data.url}\n\n`;
+                            count++;
+                        }
+                    }
+                } catch (e) {
+                    // تجاهل الدروس اللي مش موجودة
+                }
+            }
+
+            statusEl.innerText = `تم الانتهاء! تم العثور على ${count} فيديو.`;
+            
+            // تحميل الملف النصي
+            const blob = new Blob([links], { type: 'text/plain;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'extracted_videos.txt';
+            a.click();
+        }
+    </script>
+</body>
+</html>
