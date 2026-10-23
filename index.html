@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مشغل وتحميل الفيديو - Pentest</title>
+    <!-- استدعاء مكتبة Hls.js عشان نقدر نتعامل مع روابط البث -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            width: 90%;
+            max-width: 900px;
+            background: #1e1e1e;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #2a2a2a;
+            color: white;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #downloadBtn {
+            background-color: #28a745;
+            display: none; /* مخفي لحد ما الفيديو يجهز */
+            margin-top: 15px;
+            width: 100%;
+        }
+        #downloadBtn:hover {
+            background-color: #218838;
+        }
+        .video-wrapper {
+            margin-top: 20px;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+            position: relative;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        /* شاشة تحميل صغيرة */
+        .loader {
+            display: none;
+            margin-top: 15px;
+            color: #f39c12;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>اختبار سحب وتحميل الفيديو</h2>
+        <div class="input-group">
+            <input type="number" id="lessonId" value="16" placeholder="رقم الدرس">
+            <button onclick="fetchVideo()">جلب الفيديو</button>
+        </div>
+
+        <div id="loader" class="loader">جاري جلب بيانات الفيديو...</div>
+
+        <div class="video-wrapper" id="videoContainer">
+            <!-- هنحط الفيديو هنا -->
+        </div>
+
+        <button id="downloadBtn" onclick="downloadVideo()">⬇️ تحميل الفيديو للجهاز</button>
+    </div>
+
+    <script>
+        let currentIframeUrl = "";
+        let realVideoUrl = "";
+
+        async function fetchVideo() {
+            const lessonId = document.getElementById('lessonId').value;
+            const videoContainer = document.getElementById('videoContainer');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const loader = document.getElementById('loader');
+
+            videoContainer.innerHTML = '';
+            videoContainer.style.display = 'none';
+            downloadBtn.style.display = 'none';
+            loader.style.display = 'block';
+            currentIframeUrl = "";
+            realVideoUrl = "";
+
+            const apiUrl = `https://hossameddin.tech/api/lessons/${lessonId}/video`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) throw new Error(`خطأ: ${response.status}`);
+
+                const data = await response.json();
+                
+                if (data && data.url) {
+                    currentIframeUrl = data.url;
+                    console.log("Iframe URL:", currentIframeUrl);
+                    
+                    // وضع الفيديو في iframe
+                    const iframe = document.createElement('iframe');
+                    iframe.src = currentIframeUrl;
+                    iframe.allow = "autoplay; fullscreen; encrypted-media; picture-in-picture";
+                    iframe.allowFullscreen = true;
+                    
+                    videoContainer.appendChild(iframe);
+                    videoContainer.style.display = 'block';
+                    
+                    // إظهار زرار التحميل
+                    downloadBtn.style.display = 'block';
+                }
+            } catch (error) {
+                alert("فشل الجلب: " + error.message);
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // دالة التحميل
+        function downloadVideo() {
+            if (!currentIframeUrl) return;
+
+            const downloadBtn = document.getElementById('downloadBtn');
+            const originalText = downloadBtn.innerText;
+            downloadBtn.innerText = "⏳ جاري استخراج رابط التحميل المباشر...";
+            downloadBtn.disabled = true;
+
+            // Bunny Stream بيعتمد على استخراج الـ m3u8 من داخل الـ iframe
+            // أسهل وأضمن طريقة في المتصفح هي فتح صفحة الـ iframe في نافذة جديدة وتحميلها،
+            // أو استخدام API بتاع Bunny لو متاح. هنا هنعمل حيلة برمجية.
+            
+            // الحيلة: فتح الرابط في نافذة جديدة وإجبار المتصفح على التحميل
+            // (ملاحظة: لو الـ CDN مش مدعم التحميل المباشر، المتصفح هيفتح الفيديو)
+            const downloadUrl = currentIframeUrl.replace('autoplay=true', 'autoplay=false');
+            
+            // فتح في نافذة جديدة
+            const newWindow = window.open(downloadUrl, '_blank');
+            
+            // تنبيه للمستخدم
+            setTimeout(() => {
+                alert("بما إن الفيديو محمي، تم فتحه في نافذة جديدة. لو عايز تحمله، استخدم أداة مثل yt-dlp أو برامج تحميل الفيديو (Video Downloader).");
+                downloadBtn.innerText = originalText;
+                downloadBtn.disabled = false;
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
